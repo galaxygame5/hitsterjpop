@@ -706,20 +706,42 @@ function normalizeStr(s) {
     .replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
     .replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
     .toLowerCase()
-    .replace(/[\s・〜~ー\-!'’".,?？!！()（）&＆/／『』「」]/g, '');
+    .replace(/[\s・〜~ー\-!'’".,?？!！()（）&＆/／『』「」×]/g, '');
 }
 
+// MIX / リミックス / カバー / メドレー / 別バージョン / コラボ別名義を厳格除外
 const BANNED_VERSION_WORDS = [
-  'off vocal', 'offvocal', 'instrumental', 'karaoke', 'remix', 'live', 'cover',
-  'オルゴール', 'music box', 'musicbox', 'acoustic', '8-bit', '8bit', 'piano',
-  'sped up', 'slowed', 'tv size', 'short ver', 'tribute', 'カラオケ', 'インスト',
-  '弾き語り', 'カバー', '吹奏楽', '合唱', 'bgm'
+  'off vocal', 'offvocal', 'instrumental', 'karaoke', 'remix', 'remixed', 'mix', 'megamix',
+  'mashup', 'medley', 'live', 'cover', 'covered', 'tribute', 'version', 'ver.', 'ver ',
+  'オルゴール', 'music box', 'musicbox', 'acoustic', '8-bit', '8bit', 'piano', 'synth',
+  'sped up', 'slowed', 'tv size', 'short ver', 'edit', 'dub', 'bootleg',
+  'カラオケ', 'インスト', 'リミックス', 'ミックス', 'メドレー', 'マッシュアップ',
+  '弾き語り', 'カバー', '吹奏楽', '合唱', 'bgm', 'アレンジ', 'バージョン'
 ];
 
-function isBannedVersion(trackName, collectionName) {
+function hasBannedVersionToken(trackName, collectionName, originalArtist, originalTitle, resultArtist, resultTitle) {
   const lowTrack = String(trackName || '').toLowerCase();
   const lowCol = String(collectionName || '').toLowerCase();
-  return BANNED_VERSION_WORDS.some(w => lowTrack.includes(w) || lowCol.includes(w));
+
+  // 元曲名や元アーティスト名自体に含まれない「別Ver系ワード」は即除外
+  const origT = String(originalTitle || '').toLowerCase();
+  const origA = String(originalArtist || '').toLowerCase();
+
+  for (const w of BANNED_VERSION_WORDS) {
+    if (lowTrack.includes(w) && !origT.includes(w)) return true;
+    if (lowCol.includes(w) && !origT.includes(w) && !origA.includes(w)) return true;
+  }
+
+  // 別アーティストとのコラボ・ミックス名義（例: "A × B", "A with B", "A feat. B"）を除外
+  const rArtRaw = String(resultArtist || '').toLowerCase();
+  const collabSeparators = [' × ', ' x ', ' vs ', ' vs. ', ' with ', ' feat.', ' feat ', ' ft.', ' ft '];
+  for (const sep of collabSeparators) {
+    if (rArtRaw.includes(sep) && !origA.includes(sep.trim())) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function queryItunesJsonp(searchTerm) {
@@ -750,7 +772,7 @@ function queryItunesJsonp(searchTerm) {
       resolve((data && Array.isArray(data.results)) ? data.results : []);
     };
 
-    script.src = `https://itunes.apple.com/search?term=${query}&media=music&entity=song&country=JP&limit=20&callback=${callbackName}`;
+    script.src = `https://itunes.apple.com/search?term=${query}&media=music&entity=song&country=JP&limit=35&callback=${callbackName}`;
     script.onerror = () => {
       if (!settled) {
         settled = true;
@@ -766,43 +788,51 @@ function queryItunesJsonp(searchTerm) {
 function pickBestPreviewFromResults(results, artist, title) {
   const normTitle = normalizeStr(title);
   const normArtist = normalizeStr(artist);
+  if (!normTitle || !normArtist) return null;
 
-  let bestStrict = null;
-  let bestStrictScore = -1;
-
-  let bestFallback = null;
-  let bestFallbackScore = -1;
+  let bestUrl = null;
+  let bestScore = -999;
 
   for (const item of results) {
     if (!item.previewUrl) continue;
-    if (isBannedVersion(item.trackName, item.collectionName)) continue;
+    if (hasBannedVersionToken(item.trackName, item.collectionName, artist, title, item.artistName, item.trackName)) {
+      continue;
+    }
 
     const rTitle = normalizeStr(item.trackName);
     const rArtist = normalizeStr(item.artistName);
 
-    const titleExact = rTitle === normTitle;
-    const titleIncludes = normTitle.length >= 2 && rTitle.includes(normTitle);
-    if (!titleExact && !titleIncludes) continue;
-
+    // 同名曲回避：アーティスト名が一致しない候補は原則弾く
     const artistExact = rArtist === normArtist;
     const artistIncludes = normArtist.length >= 2 && (rArtist.includes(normArtist) || normArtist.includes(rArtist));
+    if (!artistExact && !artistIncludes) continue;
 
-    if (artistExact || artistIncludes) {
-      const score = (titleExact ? 6 : 3) + (artistExact ? 6 : 3);
-      if (score > bestStrictScore) {
-        bestStrictScore = score;
-        bestStrict = item.previewUrl;
-      }
-    } else if (titleExact) {
-      const score = 4;
-      if (score > bestFallbackScore) {
-        bestFallbackScore = score;
-        bestFallback = item.previewUrl;
-      }
+    // 曲名の一致確認（余計な括弧や副題が付いた別Verは減点）
+    const titleExact = rTitle === normTitle;
+    const titleStartsWith = rTitle.startsWith(normTitle) && rTitle.length <= normTitle.length + 4;
+    const titleIncludes = normTitle.length >= 2 && rTitle.includes(normTitle);
+    if (!titleExact && !titleStartsWith && !titleIncludes) continue;
+
+    let score = 0;
+    if (artistExact) score += 20;
+    else if (artistIncludes) score += 8;
+
+    if (titleExact) score += 20;
+    else if (titleStartsWith) score += 10;
+    else if (titleIncludes) score += 2;
+
+    // 曲名に括弧（ (...) / （...） ）が付いているものは別Verの可能性があるため減点
+    if (/[（(【\[]/.test(String(item.trackName || '')) && !/[（(【\[]/.test(String(title || ''))) {
+      score -= 8;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestUrl = item.previewUrl;
     }
   }
 
-  return bestStrict || bestFallback || null;
+  return bestUrl;
 }
 
 async function searchApplePreviewUrl(artist, title) {
@@ -810,7 +840,7 @@ async function searchApplePreviewUrl(artist, title) {
   const firstMatch = pickBestPreviewFromResults(firstResults, artist, title);
   if (firstMatch) return firstMatch;
 
-  const secondResults = await queryItunesJsonp(title);
+  const secondResults = await queryItunesJsonp(`${title} ${artist}`);
   const secondMatch = pickBestPreviewFromResults(secondResults, artist, title);
   if (secondMatch) return secondMatch;
 
@@ -837,7 +867,7 @@ function playPreviewByUrl(url) {
   isPreviewLoading = false;
   if (!url) {
     updatePlayButtonUI();
-    showToast('試聴サンプルが見つかりませんでした。「音源なし/別曲スキップ」で次へ進めます。', 'warn');
+    showToast('該当するオリジナル音源が見つかりませんでした。「別曲/オルゴール等スキップ」で次へ進めます。', 'warn');
     return;
   }
 
@@ -851,7 +881,7 @@ function playPreviewByUrl(url) {
   previewAudio.onerror = () => {
     isPreviewPlaying = false;
     updatePlayButtonUI();
-    showToast('音声の再生に失敗しました。「音源なし/別曲スキップ」も使えます。', 'error');
+    showToast('音声の再生に失敗しました。「別曲/オルゴール等スキップ」も使えます。', 'error');
   };
 
   previewAudio.play().then(() => {
@@ -881,7 +911,7 @@ function updatePlayButtonUI() {
 // ============================================================================
 // 3. PeerJS P2P 通信＆ホスト権威型ステート
 // ============================================================================
-const ROOM_PREFIX = 'hitster-jpop-surv-v5-';
+const ROOM_PREFIX = 'hitster-jpop-surv-v6-';
 let peer = null;
 let myId = null;
 let myName = '';
@@ -1220,7 +1250,6 @@ async function handleAction(senderId, msg) {
       break;
     }
 
-    // オルゴール・別バージョン・違う曲・音源なし用スキップ（通常スキップ回数を消費しない）
     case 'SKIP_NO_AUDIO': {
       if (masterState.phase !== 'TURN') return;
       const active = masterState.players[masterState.turnIndex];
@@ -1552,7 +1581,6 @@ function renderCenterArea(active, isMyTurn, me) {
           <i class="fa-solid fa-compact-disc"></i>
         </div>
 
-        <!-- 再生ボタンのすぐ横に音量スライダー -->
         <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
           <button onclick="toggleSongPreview()"
             class="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow transition active:scale-95">
@@ -1577,7 +1605,7 @@ function renderCenterArea(active, isMyTurn, me) {
         ${viewState.previewNotFound ? `
           <div class="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-black">
             <i class="fa-solid fa-triangle-exclamation mr-1"></i>
-            試聴サンプルが見つかりませんでした。スキップ権を消費せずに次へ進めます。
+            該当するオリジナル音源が見つかりませんでした。スキップ権を消費せずに次へ進めます。
           </div>
         ` : ''}
 
