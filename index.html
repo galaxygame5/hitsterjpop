@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HITSTER J-POP サバイバル</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@500;700;900&family=Outfit:wght@700;900&display=swap');
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      user-select: none;
+    }
+    .font-display {
+      font-family: 'Outfit', 'Noto Sans JP', sans-serif;
+    }
+    .spin-slow {
+      animation: spinSlow 4s linear infinite;
+    }
+    @keyframes spinSlow {
+      100% { transform: rotate(360deg); }
+    }
+    .tl-scroll::-webkit-scrollbar {
+      height: 8px;
+    }
+    .tl-scroll::-webkit-scrollbar-track {
+      background: #e2e8f0;
+      border-radius: 9999px;
+    }
+    .tl-scroll::-webkit-scrollbar-thumb {
+      background: #94a3b8;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-gradient-to-br from-sky-50 via-white to-amber-50">
+
+  <!-- HEADER -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur border-b-2 border-slate-200 px-4 py-3 shadow-sm">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow">
+          <i class="fa-solid fa-compact-disc text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-display text-xl sm:text-2xl font-black text-slate-900">HITSTER J-POP SURVIVAL</h1>
+          <p class="text-xs font-bold text-slate-500">全員共通TL・ライフ制サバイバル</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-copy-code" onclick="copyRoomCode()" class="hidden items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-950 font-black text-sm border border-indigo-300 transition active:scale-95">
+          <i class="fa-solid fa-key text-indigo-600"></i>
+          <span>合言葉: <strong id="header-code" class="font-display text-base"></strong></span>
+          <i class="fa-regular fa-copy ml-1"></i>
+        </button>
+
+        <button id="btn-mute" onclick="toggleMute()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-sm border border-slate-300 transition active:scale-95">
+          <i id="icon-mute" class="fa-solid fa-volume-high text-emerald-600"></i>
+          <span id="label-mute" class="hidden sm:inline">音声ON</span>
+        </button>
+
+        <button onclick="openRules()" class="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-sm border border-amber-300 transition active:scale-95">
+          <i class="fa-solid fa-book-open text-amber-600"></i>
+          <span>ルール</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- TOAST -->
+  <div id="toast-box" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col gap-2 w-11/12 max-w-md"></div>
+
+  <!-- MAIN -->
+  <main id="app-root" class="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center"></main>
+
+  <!-- RULES MODAL -->
+  <div id="rules-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-3xl max-w-xl w-full max-h-[85vh] flex flex-col shadow-2xl border-2 border-slate-200 overflow-hidden">
+      <div class="px-6 py-4 bg-indigo-600 text-white flex items-center justify-between">
+        <h2 class="text-lg font-black"><i class="fa-solid fa-list-check mr-2"></i>ゲームルール</h2>
+        <button onclick="closeRules()" class="w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center font-bold">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="p-6 overflow-y-auto space-y-3 text-sm sm:text-base font-bold text-slate-700 leading-relaxed">
+        <p>1. 全員で<strong>1つの共通タイムライン（TL）</strong>にカードを並べていきます。</p>
+        <p>2. 各プレイヤーは<strong>初期ライフ</strong>（デフォルト2、ホストが1〜10で変更可）を持ちます。</p>
+        <p>3. 順番に1枚引き、再生ボタンで試聴して、発売年が左から右へ古→新になる位置に置きます。</p>
+        <p>4. 年代順が合っていればカードがTLに追加されます。<strong>間違えるとライフが1減ります</strong>。</p>
+        <p>5. <strong>スキップは1人1回だけ</strong>使えます（現在の曲を捨てて次の曲を引きます）。</p>
+        <p>6. 検索ミスなどで別の曲が流れた場合は、結果発表画面の<strong>「検索ミスやり直し（ライフ戻してスキップ）」</strong>でライフやTLを元に戻して新しい曲を引き直せます。</p>
+        <p>7. ライフが0になると脱落し、<strong>最後まで生き残ったプレイヤーの勝利</strong>です。</p>
+      </div>
+      <div class="p-4 bg-slate-50 border-t border-slate-200 text-right">
+        <button onclick="closeRules()" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ============================================================================
+// 1. 曲リスト（★★★ ここに曲リストを挿入してください ★★★）
+//    フォーマット: { y: リリース年(数値), a: "アーティスト名", t: "曲名" },
+//    例:
+//      { y: 1995, a: "スピッツ", t: "ロビンソン" },
+//      { y: 2018, a: "米津玄師", t: "Lemon" },
+// ============================================================================
+const SONG_POOL = [
+  // ▼▼▼ ここに曲リストを挿入 ▼▼▼
+// 2017・2019 (移動分)
+  { y: 2017, a: "DISH//", t: "猫" },
+  { y: 2019, a: "YOASOBI", t: "夜に駆ける" },
+  { y: 2019, a: "瑛人", t: "香水" },
+
+// 2020s
+  { y: 2020, a: "NiziU", t: "Make you happy" },
+  { y: 2020, a: "LiSA", t: "炎" },
+  { y: 2020, a: "米津玄師", t: "感電" },
+  { y: 2020, a: "優里", t: "ドライフラワー" },
+  { y: 2020, a: "Ado", t: "うっせぇわ" },
+  { y: 2020, a: "back number", t: "水平線" },
+  { y: 2020, a: "Vaundy", t: "怪獣の花唄" },
+  { y: 2020, a: "新しい学校のリーダーズ", t: "オトナブルー" },
+  { y: 2021, a: "藤井 風", t: "きらり" },
+  { y: 2021, a: "Awesome City Club", t: "勿忘" },
+  { y: 2021, a: "YOASOBI", t: "怪物" },
+  { y: 2021, a: "Official髭男dism", t: "Cry Baby" },
+  { y: 2021, a: "マカロニえんぴつ", t: "なんでもないよ、" },
+  { y: 2021, a: "Tani Yuuki", t: "W/X/Y" },
+  { y: 2022, a: "Ado", t: "新時代" },
+  { y: 2022, a: "Official髭男dism", t: "Subtitle" },
+  { y: 2022, a: "SEKAI NO OWARI", t: "Habit" },
+  { y: 2022, a: "米津玄師", t: "KICK BACK" },
+  { y: 2022, a: "Mrs. GREEN APPLE", t: "ダンスホール" },
+  { y: 2022, a: "imase", t: "NIGHT DANCER" },
+  { y: 2023, a: "YOASOBI", t: "アイドル" },
+  { y: 2023, a: "tuki.", t: "晩餐歌" },
+  { y: 2023, a: "Mrs. GREEN APPLE", t: "ケセラセラ" },
+  { y: 2023, a: "スピッツ", t: "美しい鰭" },
+  { y: 2023, a: "キタニタツヤ", t: "青のすみか" },
+  { y: 2024, a: "Creepy Nuts", t: "Bling-Bang-Bang-Born" },
+  { y: 2024, a: "Mrs. GREEN APPLE", t: "ライラック" },
+  { y: 2024, a: "こっちのけんと", t: "はいよろこんで" },
+  { y: 2024, a: "Omoinotake", t: "幾億光年" },
+  { y: 2024, a: "ILLIT", t: "Magnetic" },
+  { y: 2024, a: "米津玄師", t: "さよーならまたいつか!" },
+  { y: 2024, a: "Vaundy", t: "タイムパラドックス" },
+  { y: 2025, a: "Mrs. GREEN APPLE", t: "ダーリン" },
+  { y: 2025, a: "米津玄師", t: "Plazma" },
+  { y: 2025, a: "サカナクション", t: "怪獣" },
+// 2000s
+  { y: 2000, a: "サザンオールスターズ", t: "TSUNAMI" },
+  { y: 2000, a: "SMAP", t: "らいおんハート" },
+  { y: 2000, a: "Whiteberry", t: "夏祭り" },
+  { y: 2000, a: "福山雅治", t: "桜坂" },
+  { y: 2000, a: "MISIA", t: "Everything" },
+  { y: 2000, a: "ポルノグラフィティ", t: "サウダージ" },
+  { y: 2000, a: "浜崎あゆみ", t: "M" },
+  { y: 2000, a: "キリンジ", t: "エイリアンズ" },
+  { y: 2001, a: "MONGOL800", t: "小さな恋のうた" },
+  { y: 2001, a: "CHEMISTRY", t: "PIECES OF A DREAM" },
+  { y: 2001, a: "宇多田ヒカル", t: "Can You Keep A Secret?" },
+  { y: 2001, a: "ポルノグラフィティ", t: "アゲハ蝶" },
+  { y: 2001, a: "BUMP OF CHICKEN", t: "天体観測" },
+  { y: 2002, a: "元ちとせ", t: "ワダツミの木" },
+  { y: 2002, a: "浜崎あゆみ", t: "Voyage" },
+  { y: 2002, a: "島谷ひとみ", t: "亜麻色の髪の乙女" },
+  { y: 2002, a: "ロードオブメジャー", t: "大切なもの" },
+  { y: 2003, a: "SMAP", t: "世界に一つだけの花" },
+  { y: 2003, a: "森山直太朗", t: "さくら (独唱)" },
+  { y: 2003, a: "大塚愛", t: "さくらんぼ" },
+  { y: 2003, a: "中島美嘉", t: "雪の華" },
+  { y: 2004, a: "ORANGE RANGE", t: "花" },
+  { y: 2004, a: "平井堅", t: "瞳をとじて" },
+  { y: 2004, a: "Mr.Children", t: "Sign" },
+  { y: 2004, a: "松平健", t: "マツケンサンバII" },
+  { y: 2004, a: "一青窈", t: "ハナミズキ" },
+  { y: 2005, a: "レミオロメン", t: "粉雪" },
+  { y: 2005, a: "Def Tech", t: "My Way" },
+  { y: 2005, a: "修二と彰", t: "青春アミーゴ" },
+  { y: 2005, a: "コブクロ", t: "桜" },
+  { y: 2005, a: "中島美嘉", t: "GLAMOROUS SKY" },
+  { y: 2005, a: "ケツメイシ", t: "さくら" },
+  { y: 2005, a: "AI", t: "Story" },
+  { y: 2005, a: "スキマスイッチ", t: "全力少年" },
+  { y: 2006, a: "絢香", t: "三日月" },
+  { y: 2006, a: "Aqua Timez", t: "決意の朝に" },
+  { y: 2006, a: "SEAMO", t: "ルパン・ザ・ファイヤー" },
+  { y: 2006, a: "湘南乃風", t: "純恋歌" },
+  { y: 2006, a: "秋川雅史", t: "千の風になって" },
+  { y: 2006, a: "Mr.Children", t: "しるし" },
+  { y: 2007, a: "Perfume", t: "ポリリズム" },
+  { y: 2007, a: "コブクロ", t: "蕾" },
+  { y: 2007, a: "嵐", t: "Love so sweet" },
+  { y: 2007, a: "秦基博", t: "鱗" },
+  { y: 2008, a: "GReeeeN", t: "キセキ" },
+  { y: 2008, a: "青山テルマ feat. SoulJa", t: "そばにいるね" },
+  { y: 2008, a: "嵐", t: "One Love" },
+  { y: 2008, a: "Mr.Children", t: "HANABI" },
+  { y: 2008, a: "Superfly", t: "愛をこめて花束を" },
+  { y: 2008, a: "EXILE", t: "Ti Amo" },
+  { y: 2009, a: "いきものがかり", t: "YELL" },
+  { y: 2009, a: "JUJU with JAY'ED", t: "明日がくるなら" },
+  { y: 2009, a: "flumpool", t: "星に願いを" },
+  { y: 2009, a: "ゴールデンボンバー", t: "女々しくて" },
+// 2009 (移動分)
+  { y: 2009, a: "ゴールデンボンバー", t: "女々しくて" },
+
+// 2010s
+  { y: 2010, a: "AKB48", t: "ヘビーローテーション" },
+  { y: 2010, a: "植村花菜", t: "トイレの神様" },
+  { y: 2010, a: "いきものがかり", t: "ありがとう" },
+  { y: 2010, a: "西野カナ", t: "会いたくて 会いたくて" },
+  { y: 2010, a: "嵐", t: "Monster" },
+  { y: 2011, a: "薫と友樹、たまにムック。", t: "マル・マル・モリ・モリ!" },
+  { y: 2011, a: "AKB48", t: "フライングゲット" },
+  { y: 2011, a: "斉藤和義", t: "やさしくなりたい" },
+  { y: 2011, a: "サカナクション", t: "ルーキー" },
+  { y: 2011, a: "福山雅治", t: "家族になろうよ" },
+  { y: 2012, a: "きゃりーぱみゅぱみゅ", t: "つけまつける" },
+  { y: 2012, a: "ONE OK ROCK", t: "The Beginning" },
+  { y: 2012, a: "家入レオ", t: "Shine" },
+  { y: 2013, a: "AKB48", t: "恋するフォーチュンクッキー" },
+  { y: 2013, a: "サカナクション", t: "ミュージック" },
+  { y: 2013, a: "きゃりーぱみゅぱみゅ", t: "にんじゃりばんばん" },
+  { y: 2013, a: "Linked Horizon", t: "紅蓮の弓矢" },
+  { y: 2013, a: "ゆず", t: "雨のち晴レルヤ" },
+  { y: 2013, a: "SEKAI NO OWARI", t: "RPG" },
+  { y: 2013, a: "back number", t: "高嶺の花子さん" },
+  { y: 2014, a: "秦基博", t: "ひまわりの約束" },
+  { y: 2014, a: "SEKAI NO OWARI", t: "Dragon Night" },
+  { y: 2014, a: "西野カナ", t: "Darling" },
+  { y: 2014, a: "三代目 J SOUL BROTHERS from EXILE TRIBE", t: "R.Y.U.S.E.I." },
+  { y: 2015, a: "back number", t: "クリスマスソング" },
+  { y: 2015, a: "サカナクション", t: "新宝島" },
+  { y: 2015, a: "星野源", t: "SUN" },
+  { y: 2015, a: "浦島太郎 (桐谷健太)", t: "海の声" },
+  { y: 2015, a: "ゲスの極み乙女。", t: "私以外私じゃないの" },
+  { y: 2016, a: "星野源", t: "恋" },
+  { y: 2016, a: "RADWIMPS", t: "前前前世" },
+  { y: 2016, a: "欅坂46", t: "サイレントマジョリティー" },
+  { y: 2016, a: "ピコ太郎", t: "PPAP (ペンパイナッポーアッポーペン)" },
+  { y: 2016, a: "宇多田ヒカル", t: "花束を君に" },
+  { y: 2017, a: "DAOKO×米津玄師", t: "打上花火" },
+  { y: 2017, a: "乃木坂46", t: "インフルエンサー" },
+  { y: 2017, a: "米津玄師", t: "ピースサイン" },
+  { y: 2017, a: "WANIMA", t: "やってみよう" },
+  { y: 2018, a: "米津玄師", t: "Lemon" },
+  { y: 2018, a: "あいみょん", t: "マリーゴールド" },
+  { y: 2018, a: "DA PUMP", t: "U.S.A." },
+  { y: 2018, a: "MISIA", t: "アイノカタチ feat. HIDE (GReeeeN)" },
+  { y: 2018, a: "菅田将暉", t: "さよならエレジー" },
+  { y: 2018, a: "Foorin", t: "パプリカ" },
+  { y: 2019, a: "Official髭男dism", t: "Pretender" },
+  { y: 2019, a: "King Gnu", t: "白日" },
+  { y: 2019, a: "LiSA", t: "紅蓮華" },
+  { y: 2019, a: "菅田将暉", t: "まちがいさがし" },
+// 1990s
+  { y: 1990, a: "B.B.クィーンズ", t: "おどるポンポコリン" },
+  { y: 1990, a: "KAN", t: "愛は勝つ" },
+  { y: 1990, a: "サザンオールスターズ", t: "真夏の果実" },
+  { y: 1990, a: "LINDBERG", t: "今すぐKiss Me" },
+  { y: 1990, a: "たま", t: "さよなら人類" },
+  { y: 1991, a: "小田和正", t: "ラブ・ストーリーは突然に" },
+  { y: 1991, a: "CHAGE and ASKA", t: "SAY YES" },
+  { y: 1991, a: "槇原敬之", t: "どんなときも。" },
+  { y: 1991, a: "ZARD", t: "Good-bye My Loneliness" },
+  { y: 1991, a: "尾崎豊", t: "I LOVE YOU" },
+  { y: 1991, a: "大事MANブラザーズバンド", t: "それが大事" },
+  { y: 1992, a: "米米CLUB", t: "君がいるだけで" },
+  { y: 1992, a: "B'z", t: "BLOWIN'" },
+  { y: 1992, a: "中山美穂 & WANDS", t: "世界中の誰よりきっと" },
+  { y: 1992, a: "平松愛理", t: "部屋とYシャツと私" },
+  { y: 1993, a: "ZARD", t: "負けないで" },
+  { y: 1993, a: "CHAGE and ASKA", t: "YAH YAH YAH" },
+  { y: 1993, a: "THE 虎舞竜", t: "ロード" },
+  { y: 1993, a: "松任谷由実", t: "真夏の夜の夢" },
+  { y: 1993, a: "広瀬香美", t: "ロマンスの神様" },
+  { y: 1994, a: "WANDS", t: "世界が終るまでは…" },
+  { y: 1994, a: "篠原涼子 with t.komuro", t: "恋しさと せつなさと 心強さと" },
+  { y: 1994, a: "Mr.Children", t: "innocent world" },
+  { y: 1994, a: "trf", t: "survival dAnce ~no no cry more~" },
+  { y: 1994, a: "Mr.Children", t: "Tomorrow never knows" },
+  { y: 1995, a: "高橋洋子", t: "残酷な天使のテーゼ" },
+  { y: 1995, a: "スピッツ", t: "ロビンソン" },
+  { y: 1995, a: "H Jungle with t", t: "WOW WAR TONIGHT 〜時には起こせよムーヴメント〜" },
+  { y: 1995, a: "DREAMS COME TRUE", t: "LOVE LOVE LOVE" },
+  { y: 1995, a: "岡本真夜", t: "TOMORROW" },
+  { y: 1995, a: "MY LITTLE LOVER", t: "Hello, Again 〜昔からある場所〜" },
+  { y: 1996, a: "安室奈美恵", t: "Don't wanna cry" },
+  { y: 1996, a: "PUFFY", t: "アジアの純真" },
+  { y: 1996, a: "T.M.Revolution", t: "HEART OF SWORD〜夜明け前〜" },
+  { y: 1996, a: "スピッツ", t: "チェリー" },
+  { y: 1996, a: "Mr.Children", t: "名もなき詩" },
+  { y: 1996, a: "globe", t: "DEPARTURES" },
+  { y: 1997, a: "KinKi Kids", t: "硝子の少年" },
+  { y: 1997, a: "GLAY", t: "HOWEVER" },
+  { y: 1997, a: "L'Arc〜en〜Ciel", t: "虹" },
+  { y: 1997, a: "安室奈美恵", t: "CAN YOU CELEBRATE?" },
+  { y: 1997, a: "SPEED", t: "White Love" },
+  { y: 1998, a: "Every Little Thing", t: "Time goes by" },
+  { y: 1998, a: "宇多田ヒカル", t: "Automatic" },
+  { y: 1998, a: "GLAY", t: "誘惑" },
+  { y: 1998, a: "モーニング娘。", t: "抱いてHOLD ON ME!" },
+  { y: 1998, a: "L'Arc〜en〜Ciel", t: "HONEY" },
+  { y: 1998, a: "ブラックビスケッツ", t: "Timing" },
+  { y: 1998, a: "ゆず", t: "夏色" },
+  { y: 1999, a: "嵐", t: "A・RA・SHI" },
+  { y: 1999, a: "宇多田ヒカル", t: "First Love" },
+  { y: 1999, a: "椎名林檎", t: "本能" },
+  { y: 1999, a: "モーニング娘。", t: "LOVEマシーン" },
+  { y: 1999, a: "GLAY", t: "Winter,again" },
+  { y: 1999, a: "Dragon Ash", t: "Let yourself go, Let myself go" },
+{ y: 1979, a: "松原みき", t: "真夜中のドア〜stay with me" },
+  { y: 1980, a: "松田聖子", t: "青い珊瑚礁" },
+  { y: 1980, a: "YELLOW MAGIC ORCHESTRA", t: "ライディーン" },
+  { y: 1980, a: "八神純子", t: "パープルタウン" },
+  { y: 1980, a: "もんた&ブラザーズ", t: "ダンシング・オールナイト" },
+  { y: 1981, a: "寺尾聰", t: "ルビーの指環" },
+  { y: 1981, a: "イモ欽トリオ", t: "ハイスクールララバイ" },
+  { y: 1981, a: "松田聖子", t: "夏の扉" },
+  { y: 1981, a: "中島みゆき", t: "悪女" },
+  { y: 1982, a: "中森明菜", t: "少女A" },
+  { y: 1982, a: "松田聖子", t: "赤いスイートピー" },
+  { y: 1982, a: "あみん", t: "待つわ" },
+  { y: 1982, a: "小泉今日子", t: "私の16才" },
+  { y: 1982, a: "井上陽水", t: "リバーサイドホテル" },
+  { y: 1983, a: "H2O", t: "想い出がいっぱい" },
+  { y: 1983, a: "杏里", t: "CAT'S EYE" },
+  { y: 1983, a: "村下孝蔵", t: "初恋" },
+  { y: 1983, a: "チェッカーズ", t: "ギザギザハートの子守唄" },
+  { y: 1984, a: "安全地帯", t: "ワインレッドの心" },
+  { y: 1984, a: "竹内まりや", t: "プラスティック・ラブ" },
+  { y: 1984, a: "中森明菜", t: "北ウイング" },
+  { y: 1985, a: "レベッカ", t: "フレンズ" },
+  { y: 1985, a: "尾崎豊", t: "卒業" },
+  { y: 1985, a: "C-C-B", t: "Romanticが止まらない" },
+  { y: 1985, a: "おニャン子クラブ", t: "セーラー服を脱がさないで" },
+  { y: 1985, a: "荻野目洋子", t: "ダンシング・ヒーロー (Eat You Up)" },
+  { y: 1986, a: "1986オメガトライブ", t: "君は1000%" },
+  { y: 1986, a: "中森明菜", t: "DESIRE -情熱-" },
+  { y: 1986, a: "徳永英明", t: "レイニー ブルー" },
+  { y: 1986, a: "瀬川瑛子", t: "命くれない" },
+  { y: 1987, a: "TM NETWORK", t: "Get Wild" },
+  { y: 1987, a: "BOØWY", t: "MARIONETTE -マリオネット-" },
+  { y: 1988, a: "光GENJI", t: "パラダイス銀河" },
+  { y: 1988, a: "久保田利伸", t: "You were mine" },
+  { y: 1988, a: "長渕剛", t: "乾杯" },
+  { y: 1988, a: "工藤静香", t: "MUGO・ん…色っぽい" },
+  { y: 1989, a: "プリンセス プリンセス", t: "Diamonds" },
+  { y: 1989, a: "Wink", t: "淋しい熱帯魚" },
+  { y: 1989, a: "UNICORN", t: "大迷惑" },
+  { y: 1989, a: "X", t: "紅" },
+{ y: 2000, a: "モーニング娘。", t: "恋のダンスサイト" },
+  { y: 2000, a: "小柳ゆき", t: "愛情" },
+  { y: 2000, a: "浜崎あゆみ", t: "SEASONS" },
+  { y: 2000, a: "aiko", t: "ボーイフレンド" },
+  { y: 2000, a: "倉木麻衣", t: "Secret of my heart" },
+  { y: 2000, a: "椎名林檎", t: "ギブス" },
+  { y: 2000, a: "B'z", t: "今夜月の見える丘に" },
+  { y: 2000, a: "宇多田ヒカル", t: "Wait & See 〜リスク〜" },
+  { y: 2000, a: "ポルノグラフィティ", t: "ヒトリノ夜" },
+  { y: 2000, a: "鬼束ちひろ", t: "月光" },
+  { y: 2000, a: "藤井隆", t: "ナンダカンダ" },
+  { y: 2000, a: "ゆず", t: "飛べない鳥" },
+  { y: 2001, a: "宇多田ヒカル", t: "traveling" },
+  { y: 2001, a: "平井堅", t: "楽園" },
+  { y: 2001, a: "RIP SLYME", t: "One" },
+  { y: 2001, a: "Dragon Ash", t: "Fantasista" },
+  { y: 2001, a: "KICK THE CAN CREW", t: "マルシェ" },
+  { y: 2001, a: "JUDY AND MARY", t: "散歩道" },
+  { y: 2001, a: "B'z", t: "ultra soul" },
+  { y: 2001, a: "GLAY", t: "Way of Difference" },
+  { y: 2002, a: "CHEMISTRY", t: "Point of No Return" },
+  { y: 2002, a: "宇多田ヒカル", t: "SAKURAドロップス" },
+  { y: 2002, a: "B'z", t: "熱き鼓動の果て" },
+  { y: 2002, a: "HY", t: "AM11:00" },
+  { y: 2002, a: "中島美嘉", t: "WILL" },
+  { y: 2002, a: "平井堅", t: "大きな古時計" },
+  { y: 2003, a: "B'z", t: "IT'S SHOWTIME!!" },
+  { y: 2003, a: "aiko", t: "えりあし" },
+  { y: 2003, a: "AI", t: "My Friend" },
+  { y: 2003, a: "EXILE", t: "Choo Choo TRAIN" },
+  { y: 2003, a: "ASIAN KUNG-FU GENERATION", t: "君という花" },
+  { y: 2003, a: "ORANGE RANGE", t: "上海ハニー" },
+  { y: 2004, a: "aiko", t: "花風" },
+  { y: 2004, a: "ORANGE RANGE", t: "以心電信" },
+  { y: 2004, a: "ASIAN KUNG-FU GENERATION", t: "リライト" },
+  { y: 2004, a: "柴咲コウ", t: "かたち あるもの" },
+  { y: 2004, a: "大塚愛", t: "金魚花火" },
+  { y: 2004, a: "宇多田ヒカル", t: "誰かの願いが叶うころ" },
+  { y: 2004, a: "w-inds.", t: "キレイだ" },
+  { y: 2005, a: "EXILE", t: "real world" },
+  { y: 2005, a: "UVERworld", t: "D-tecnoLife" },
+  { y: 2005, a: "Mr.Children", t: "and I love you" },
+  { y: 2005, a: "絢香", t: "I believe" },
+  { y: 2005, a: "大塚愛", t: "プラネタリウム" },
+  { y: 2005, a: "WaT", t: "僕のキモチ" },
+  { y: 2005, a: "GReeeeN", t: "道" },
+  { y: 2005, a: "YUI", t: "TOKYO" },
+  { y: 2005, a: "浜崎あゆみ", t: "HEAVEN" },
+  { y: 2006, a: "YUI", t: "Good-bye days" },
+  { y: 2006, a: "倖田來未", t: "恋のつぼみ" },
+  { y: 2006, a: "小田和正", t: "こころ" },
+  { y: 2006, a: "嵐", t: "きっと大丈夫" },
+  { y: 2006, a: "Every Little Thing", t: "スイミー" },
+  { y: 2006, a: "DJ OZMA", t: "アゲ♂アゲ♂EVERY☆騎士" },
+  { y: 2007, a: "宇多田ヒカル", t: "Flavor Of Life" },
+  { y: 2007, a: "YUI", t: "CHE.R.RY" },
+  { y: 2007, a: "コブクロ", t: "蒼く優しく" },
+  { y: 2007, a: "GReeeeN", t: "愛唄" },
+  { y: 2007, a: "安室奈美恵", t: "Baby Don't Cry" },
+  { y: 2007, a: "RADWIMPS", t: "有心論" },
+  { y: 2008, a: "Angela Aki", t: "手紙 〜拝啓 十五の君へ〜" },
+  { y: 2008, a: "羞恥心", t: "羞恥心" },
+  { y: 2008, a: "大橋卓弥", t: "ありがとう" },
+  { y: 2008, a: "安室奈美恵", t: "NEW LOOK" },
+  { y: 2008, a: "Perfume", t: "シークレットシークレット" },
+  { y: 2008, a: "西野カナ", t: "君に会いたくなるから" },
+  { y: 2008, a: "flumpool", t: "花になれ" },
+  { y: 2009, a: "放課後ティータイム", t: "Don't say \"lazy\"" },
+  { y: 2009, a: "放課後ティータイム", t: "Cagayake!GIRLS" },
+  { y: 2009, a: "FUNKY MONKEY BABYS", t: "ヒーロー" },
+  { y: 2009, a: "aiko", t: "milk" },
+  { y: 2009, a: "B'z", t: "イチブトゼンブ" },
+  { y: 2009, a: "湘南乃風", t: "睡蓮花" },
+  { y: 2010, a: "KARA", t: "ミスター" },
+  { y: 2010, a: "少女時代", t: "Gee" },
+  { y: 2010, a: "KARA", t: "ジャンピン" },
+  { y: 2010, a: "少女時代", t: "Genie" },
+  { y: 2010, a: "EXILE", t: "I Wish For You" },
+  { y: 2010, a: "桑田佳祐", t: "本当は怖い愛とロマンス" },
+  { y: 2010, a: "Perfume", t: "VOICE" },
+  { y: 2010, a: "UVERworld", t: "クオリア" },
+  { y: 2010, a: "AKB48", t: "ポニーテールとシュシュ" },
+  { y: 2011, a: "AKB48", t: "Everyday、カチューシャ" },
+  { y: 2011, a: "星野源", t: "くだらないの中に" },
+  { y: 2011, a: "でんぱ組.inc", t: "でんぱれーどJAPAN" },
+  { y: 2011, a: "KARA", t: "ジェットコースターラブ" },
+  { y: 2011, a: "ソナーポケット", t: "365日のラブストーリー。" },
+  { y: 2012, a: "サカナクション", t: "夜の踊り子" },
+  { y: 2012, a: "乃木坂46", t: "ぐるぐるカーテン" },
+  { y: 2012, a: "高橋優", t: "福笑い" },
+  { y: 2012, a: "いきものがかり", t: "風吹けば恋" },
+  { y: 2012, a: "ゲスの極み乙女。", t: "キラーボール" },
+  { y: 2012, a: "flumpool", t: "証" },
+  { y: 2012, a: "miwa", t: "ヒカリヘ" },
+  { y: 2013, a: "ゆず", t: "REASON" },
+  { y: 2013, a: "AAA", t: "恋音と雨空" },
+  { y: 2013, a: "Mr.Children", t: "祈りは涙の軌道" },
+  { y: 2013, a: "SEKAI NO OWARI", t: "炎と森のカーニバル" },
+  { y: 2013, a: "RADWIMPS", t: "会心の一撃" },
+  { y: 2013, a: "乃木坂46", t: "ガールズルール" },
+  { y: 2013, a: "KANA-BOON", t: "ないものねだり" },
+  { y: 2013, a: "CREAM", t: "Shooting Star" },
+  { y: 2013, a: "ゴールデンボンバー", t: "101回目の呪い" },
+  { y: 2013, a: "星野源", t: "化物" },
+  { y: 2013, a: "E-girls", t: "Follow Me" },
+  { y: 2014, a: "乃木坂46", t: "何度目の青空か?" },
+  { y: 2014, a: "ゲスの極み乙女。", t: "猟奇的なキスを私にして" },
+  { y: 2014, a: "May J.", t: "Let It Go 〜ありのままで〜" },
+  { y: 2014, a: "Superfly", t: "タマシイレボリューション" },
+  { y: 2014, a: "back number", t: "ヒロイン" },
+  { y: 2015, a: "西野カナ", t: "トリセツ" },
+  { y: 2015, a: "ゲスの極み乙女。", t: "ロマンスがありあまる" },
+  { y: 2015, a: "back number", t: "手紙" },
+  { y: 2015, a: "BUMP OF CHICKEN", t: "Hello,world!" },
+  { y: 2015, a: "乃木坂46", t: "今、話したい誰かがいる" },
+  { y: 2015, a: "湘南乃風", t: "黄金魂" },
+  { y: 2016, a: "Creepy Nuts", t: "合法的トビ方ノススメ" },
+  { y: 2016, a: "RADWIMPS", t: "なんでもないや" },
+  { y: 2016, a: "back number", t: "ハッピーエンド" },
+  { y: 2016, a: "宇多田ヒカル featuring 椎名林檎", t: "二時間だけのバカンス" },
+  { y: 2016, a: "乃木坂46", t: "サヨナラの意味" },
+  { y: 2016, a: "Aimer", t: "カタオモイ" },
+  { y: 2016, a: "Official髭男dism", t: "What's Going On?" },
+  { y: 2016, a: "WANIMA", t: "ともに" },
+  { y: 2017, a: "米津玄師", t: "灰色と青 (+菅田将暉)" },
+  { y: 2017, a: "あいみょん", t: "君はロックを聴かない" },
+  { y: 2017, a: "TWICE", t: "TT -Japanese ver.-" },
+  { y: 2017, a: "乃木坂46", t: "逃げ水" },
+  { y: 2017, a: "King Gnu", t: "Vinyl" },
+  { y: 2017, a: "平井大", t: "Slow & Easy" },
+  { y: 2018, a: "Official髭男dism", t: "ノーダウト" },
+  { y: 2018, a: "Mrs. GREEN APPLE", t: "青と夏" },
+  { y: 2018, a: "Mrs. GREEN APPLE (feat. 井上苑子)", t: "点描の歌" },
+  { y: 2018, a: "King Gnu", t: "Prayer X" },
+  { y: 2018, a: "あいみょん", t: "愛を伝えたいだとか" },
+  { y: 2018, a: "ずっと真夜中でいいのに。", t: "秒針を噛む" },
+  { y: 2018, a: "ヨルシカ", t: "ただ君に晴れ" },
+  { y: 2019, a: "優里", t: "かくれんぼ" },
+  { y: 2019, a: "Official髭男dism", t: "I LOVE..." },
+  { y: 2019, a: "King Gnu", t: "Teenager Forever" },
+  { y: 2019, a: "ヨルシカ", t: "春泥棒" },
+  { y: 2019, a: "藤井 風", t: "何なんw" },
+  { y: 2019, a: "Official髭男dism", t: "宿命" },
+  { y: 2020, a: "YOASOBI", t: "群青" },
+  { y: 2020, a: "Saucy Dog", t: "シンデレラボーイ" },
+  { y: 2020, a: "Vaundy", t: "不可幸力" },
+  { y: 2020, a: "藤井 風", t: "死ぬのがいいわ" },
+  { y: 2021, a: "Ado", t: "ギラギラ" },
+  { y: 2021, a: "LiSA", t: "明け星" },
+  { y: 2021, a: "ずっと真夜中でいいのに。", t: "暗く黒く" },
+  { y: 2021, a: "Ado", t: "踊" },
+  { y: 2021, a: "LiSA", t: "白銀" },
+  { y: 2021, a: "DISH//", t: "沈丁花" },
+  { y: 2021, a: "YOASOBI", t: "ハルカ" },
+  { y: 2021, a: "King Gnu", t: "一途" },
+  { y: 2021, a: "優里", t: "ベテルギウス" },
+  { y: 2021, a: "milet×Aimer×幾田りら", t: "おもかげ" },
+  { y: 2022, a: "Ado", t: "逆光" },
+  { y: 2022, a: "幾田りら", t: "Sparkle" },
+  { y: 2022, a: "米津玄師", t: "M八七" },
+  { y: 2022, a: "YOASOBI", t: "祝福" },
+  { y: 2022, a: "King Gnu", t: "逆夢" },
+  { y: 2022, a: "Mrs. GREEN APPLE", t: "Soranji" },
+  { y: 2022, a: "NewJeans", t: "Hype Boy" },
+  { y: 2022, a: "結束バンド", t: "青春コンプレックス" },
+  { y: 2022, a: "wacci", t: "恋だろ" },
+  { y: 2023, a: "YOASOBI", t: "勇者" },
+  { y: 2023, a: "Mrs. GREEN APPLE", t: "Magic" },
+  { y: 2023, a: "King Gnu", t: "SPECIALZ" },
+  { y: 2023, a: "Ado", t: "唱" },
+  { y: 2023, a: "藤井 風", t: "花" },
+  { y: 2023, a: "FRUITS ZIPPER", t: "わたしの一番かわいいところ" },
+  { y: 2024, a: "Mrs. GREEN APPLE", t: "ビターバカンス" },
+  { y: 2024, a: "Creepy Nuts", t: "オトノケ" },
+  { y: 2024, a: "CUTIE STREET", t: "かわいいだけじゃだめですか？" },
+  { y: 2025, a: "米津玄師", t: "BOW AND ARROW" },
+  { y: 2025, a: "HANA", t: "ROSE" },
+  { y: 2025, a: "アイナ・ジ・エンド", t: "革命道中" },
+  { y: 2025, a: "BE:FIRST", t: "GRIT" },
+  { y: 2025, a: "米津玄師", t: "IRIS OUT" },
+  { y: 2025, a: "Mrs. GREEN APPLE", t: "クスシキ" },
+  { y: 2025, a: "HANA", t: "Blue Jeans" },
+  { y: 2025, a: "Snow Man", t: "カリスマックス" },
+  { y: 2025, a: "M!LK", t: "好きすぎて滅！" },
+  { y: 2025, a: "Official髭男dism", t: "らしさ" },
+  { y: 2026, a: "King Gnu", t: "AIZO" },
+  { y: 2026, a: "Mrs. GREEN APPLE", t: "lulu." },
+  { y: 2026, a: "嵐", t: "Five" },
+  { y: 2026, a: "Official髭男dism", t: "スターダスト" },
+  { y: 2026, a: "宇多田ヒカル", t: "パッパパラダイス" },
+  { y: 2026, a: "Number_i", t: "3XL" },
+  // ▲▲▲ ここに曲リストを挿入 ▲▲▲
+];
+
+// 重複排除＆配列順正規化
+const CLEAN_SONG_POOL = (() => {
+  const seen = new Set();
+  const list = [];
+  for (const item of SONG_POOL) {
+    if (!item || !item.y || !item.a || !item.t) continue;
+    const key = `${item.a}__${item.t}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    list.push({ y: Number(item.y), a: String(item.a), t: String(item.t) });
+  }
+  return list;
+})();
+
+// ============================================================================
+// 2. 効果音（Web Audio API）＆ Apple Music / iTunes プレビュー再生
+// ============================================================================
+let audioCtx = null;
+let isMuted = false;
+let previewAudio = null;
+let isPreviewPlaying = false;
+let isPreviewLoading = false;
+
+function initAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function toggleMute() {
+  isMuted = !isMuted;
+  if (isMuted) stopPreviewAudio();
+  const icon = document.getElementById('icon-mute');
+  const label = document.getElementById('label-mute');
+  if (isMuted) {
+    icon.className = 'fa-solid fa-volume-xmark text-rose-600';
+    label.textContent = 'ミュート中';
+  } else {
+    icon.className = 'fa-solid fa-volume-high text-emerald-600';
+    label.textContent = '音声ON';
+    playSFX('tap');
+  }
+}
+
+function playSFX(kind) {
+  if (isMuted) return;
+  try {
+    initAudioCtx();
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    if (kind === 'tap') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(840, now + 0.06);
+      gain.gain.setValueAtTime(0.14, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+      osc.start(now); osc.stop(now + 0.07);
+    } else if (kind === 'ok') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523.25, now);
+      osc.frequency.setValueAtTime(783.99, now + 0.09);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start(now); osc.stop(now + 0.25);
+    } else if (kind === 'ng') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(240, now);
+      osc.frequency.linearRampToValueAtTime(130, now + 0.28);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.start(now); osc.stop(now + 0.3);
+    } else if (kind === 'win') {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, idx) => {
+        const o = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        o.type = 'triangle';
+        o.connect(g); g.connect(audioCtx.destination);
+        const t0 = now + idx * 0.12;
+        o.frequency.setValueAtTime(f, t0);
+        g.gain.setValueAtTime(0.2, t0);
+        g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.4);
+        o.start(t0); o.stop(t0 + 0.4);
+      });
+    }
+  } catch (e) {}
+}
+
+function stopPreviewAudio() {
+  if (previewAudio) {
+    previewAudio.pause();
+    previewAudio.currentTime = 0;
+  }
+  isPreviewPlaying = false;
+  isPreviewLoading = false;
+  updatePlayButtonUI();
+}
+
+function normalizeStr(s) {
+  return String(s || '')
+    .replace(/[！-～]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/[\u30a1-\u30f6]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60))
+    .toLowerCase()
+    .replace(/[\s・〜~ー\-!'’".,?？!！()（）&＆/／『』「」]/g, '');
+}
+
+const BANNED_VERSION_WORDS = [
+  'off vocal', 'offvocal', 'instrumental', 'karaoke', 'remix', 'live', 'cover',
+  'オルゴール', 'music box', 'musicbox', 'acoustic', '8-bit', '8bit', 'piano',
+  'sped up', 'slowed', 'tv size', 'short ver', 'tribute', 'カラオケ', 'インスト',
+  '弾き語り', 'カバー', '吹奏楽', '合唱', 'bgm'
+];
+
+function isBannedVersion(trackName, collectionName) {
+  const lowTrack = String(trackName || '').toLowerCase();
+  const lowCol = String(collectionName || '').toLowerCase();
+  return BANNED_VERSION_WORDS.some(w => lowTrack.includes(w) || lowCol.includes(w));
+}
+
+function searchApplePreviewUrl(artist, title) {
+  return new Promise((resolve) => {
+    const callbackName = 'appleMusicCb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+    const query = encodeURIComponent(`${artist} ${title}`);
+    const script = document.createElement('script');
+    let settled = false;
+
+    const cleanup = () => {
+      if (script.parentNode) script.parentNode.removeChild(script);
+      delete window[callbackName];
+    };
+
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        resolve(null);
+      }
+    }, 6000);
+
+    window[callbackName] = (data) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+
+      const results = (data && Array.isArray(data.results)) ? data.results : [];
+      const normTitle = normalizeStr(title);
+      const normArtist = normalizeStr(artist);
+
+      let best = null;
+      let bestScore = -1;
+
+      for (const item of results) {
+        if (!item.previewUrl) continue;
+        if (isBannedVersion(item.trackName, item.collectionName)) continue;
+
+        const rTitle = normalizeStr(item.trackName);
+        const rArtist = normalizeStr(item.artistName);
+
+        let score = 0;
+        if (rTitle === normTitle) score += 6;
+        else if (rTitle.includes(normTitle) && normTitle.length >= 2) score += 3;
+        else continue;
+
+        if (rArtist === normArtist) score += 6;
+        else if (rArtist.includes(normArtist) || normArtist.includes(rArtist)) score += 3;
+        else continue;
+
+        if (score > bestScore) {
+          bestScore = score;
+          best = item.previewUrl;
+        }
+      }
+
+      resolve(best);
+    };
+
+    script.src = `https://itunes.apple.com/search?term=${query}&media=music&entity=song&country=JP&limit=15&callback=${callbackName}`;
+    script.onerror = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        cleanup();
+        resolve(null);
+      }
+    };
+    document.body.appendChild(script);
+  });
+}
+
+async function toggleSongPreview() {
+  if (isMuted) {
+    showToast('ミュート中です。右上の音声ボタンをONにしてください。', 'warn');
+    return;
+  }
+  if (isPreviewPlaying) {
+    stopPreviewAudio();
+    return;
+  }
+  if (isPreviewLoading) return;
+
+  isPreviewLoading = true;
+  updatePlayButtonUI();
+  requestPreviewUrlFromHost();
+}
+
+function playPreviewByUrl(url) {
+  isPreviewLoading = false;
+  if (!url) {
+    updatePlayButtonUI();
+    showToast('この曲の公式サンプル音源が見つかりませんでした。スキップまたは再度お試しください。', 'warn');
+    return;
+  }
+
+  stopPreviewAudio();
+  previewAudio = new Audio(url);
+  previewAudio.onended = () => {
+    isPreviewPlaying = false;
+    updatePlayButtonUI();
+  };
+  previewAudio.onerror = () => {
+    isPreviewPlaying = false;
+    updatePlayButtonUI();
+    showToast('音声の再生に失敗しました。', 'error');
+  };
+
+  previewAudio.play().then(() => {
+    isPreviewPlaying = true;
+    updatePlayButtonUI();
+  }).catch(() => {
+    isPreviewPlaying = false;
+    updatePlayButtonUI();
+    showToast('ブラウザの制限で再生できませんでした。もう一度押してください。', 'warn');
+  });
+}
+
+function updatePlayButtonUI() {
+  const disc = document.getElementById('disc-icon');
+  const label = document.getElementById('play-btn-label');
+  if (disc) {
+    if (isPreviewPlaying) disc.classList.add('spin-slow');
+    else disc.classList.remove('spin-slow');
+  }
+  if (label) {
+    if (isPreviewLoading) label.textContent = '曲を取得中...';
+    else if (isPreviewPlaying) label.textContent = '再生ストップ';
+    else label.textContent = '曲を再生する';
+  }
+}
+
+// ============================================================================
+// 3. PeerJS P2P 通信＆ホスト権威型ステート（完全ネタバレ防止・巻き戻し対応）
+// ============================================================================
+const ROOM_PREFIX = 'hitster-jpop-surv-v2-';
+let peer = null;
+let myId = null;
+let myName = '';
+let isHost = false;
+let roomCode = '';
+let hostConn = null;
+let clientConns = {};
+
+let masterState = null;
+let cachedPreviewUrl = null;
+let viewState = null;
+let selectedSlot = null;
+
+function showToast(msg, type = 'info') {
+  const box = document.getElementById('toast-box');
+  const el = document.createElement('div');
+  const map = {
+    info: 'bg-slate-900 text-white',
+    success: 'bg-emerald-600 text-white',
+    warn: 'bg-amber-600 text-white',
+    error: 'bg-rose-600 text-white'
+  };
+  el.className = `${map[type] || map.info} px-4 py-3 rounded-2xl shadow-xl font-bold text-sm text-center transition-all duration-300`;
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(() => {
+    el.classList.add('opacity-0');
+    setTimeout(() => el.remove(), 300);
+  }, 3000);
+}
+
+function copyRoomCode() {
+  if (!roomCode) return;
+  navigator.clipboard.writeText(roomCode).then(() => {
+    playSFX('tap');
+    showToast(`合言葉「${roomCode}」をコピーしました`, 'success');
+  });
+}
+
+function openRules() {
+  playSFX('tap');
+  const m = document.getElementById('rules-modal');
+  m.classList.remove('hidden'); m.classList.add('flex');
+}
+
+function closeRules() {
+  playSFX('tap');
+  const m = document.getElementById('rules-modal');
+  m.classList.add('hidden'); m.classList.remove('flex');
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function createRoom() {
+  const nick = document.getElementById('nick-input').value.trim();
+  const code = document.getElementById('code-input').value.trim();
+  if (!nick) { playSFX('ng'); showToast('ニックネームを入力してください', 'error'); return; }
+  if (code.length < 1) { playSFX('ng'); showToast('合言葉を1文字以上入力してください', 'error'); return; }
+
+  playSFX('tap');
+  myName = nick;
+  roomCode = code;
+  isHost = true;
+
+  peer = new Peer(ROOM_PREFIX + encodeURIComponent(roomCode));
+  peer.on('open', (id) => {
+    myId = id;
+    masterState = {
+      roomCode,
+      hostId: myId,
+      phase: 'LOBBY',
+      initialLife: 2,
+      players: [{ id: myId, name: myName, life: 2, skipsLeft: 1, alive: true }],
+      timeline: [],
+      deck: [],
+      turnIndex: 0,
+      currentCard: null,
+      lastResult: null,
+      winnerIds: []
+    };
+    broadcastState();
+    showToast(`合言葉「${roomCode}」で部屋を作成しました`, 'success');
+  });
+
+  peer.on('connection', (conn) => {
+    conn.on('open', () => { clientConns[conn.peer] = conn; });
+    conn.on('data', (msg) => handleAction(conn.peer, msg));
+    conn.on('close', () => {
+      delete clientConns[conn.peer];
+      if (masterState && masterState.phase === 'LOBBY') {
+        masterState.players = masterState.players.filter(p => p.id !== conn.peer);
+        broadcastState();
+      }
+    });
+  });
+
+  peer.on('error', (err) => {
+    playSFX('ng');
+    showToast(err.type === 'unavailable-id' ? 'その合言葉は既に使われています' : `接続エラー: ${err.type}`, 'error');
+  });
+}
+
+function joinRoom() {
+  const nick = document.getElementById('nick-input').value.trim();
+  const code = document.getElementById('code-input').value.trim();
+  if (!nick) { playSFX('ng'); showToast('ニックネームを入力してください', 'error'); return; }
+  if (code.length < 1) { playSFX('ng'); showToast('合言葉を1文字以上入力してください', 'error'); return; }
+
+  playSFX('tap');
+  myName = nick;
+  roomCode = code;
+  isHost = false;
+
+  peer = new Peer();
+  peer.on('open', (id) => {
+    myId = id;
+    hostConn = peer.connect(ROOM_PREFIX + encodeURIComponent(roomCode), { reliable: true });
+    hostConn.on('open', () => {
+      hostConn.send({ type: 'JOIN', name: myName });
+      showToast(`部屋「${roomCode}」に入室しました`, 'success');
+    });
+    hostConn.on('data', (msg) => {
+      if (msg.type === 'SYNC_STATE') {
+        const prevPhase = viewState ? viewState.phase : null;
+        viewState = msg.state;
+        onPhaseChange(prevPhase, viewState.phase);
+        renderAll();
+      } else if (msg.type === 'PREVIEW_URL') {
+        playPreviewByUrl(msg.url);
+      } else if (msg.type === 'ERR') {
+        playSFX('ng');
+        showToast(msg.text, 'error');
+      }
+    });
+  });
+
+  peer.on('error', (err) => {
+    playSFX('ng');
+    showToast(`入室できませんでした (${err.type})`, 'error');
+  });
+}
+
+function sendAction(payload) {
+  if (isHost) handleAction(myId, payload);
+  else if (hostConn && hostConn.open) hostConn.send(payload);
+}
+
+async function requestPreviewUrlFromHost() {
+  if (isHost) {
+    if (!masterState || !masterState.currentCard) {
+      playPreviewByUrl(null);
+      return;
+    }
+    if (!cachedPreviewUrl) {
+      cachedPreviewUrl = await searchApplePreviewUrl(masterState.currentCard.a, masterState.currentCard.t);
+    }
+    playPreviewByUrl(cachedPreviewUrl);
+  } else if (hostConn && hostConn.open) {
+    hostConn.send({ type: 'GET_PREVIEW_URL' });
+  }
+}
+
+function makeMaskedState() {
+  const revealed = (masterState.phase === 'REVEAL' || masterState.phase === 'GAME_OVER');
+  let maskedCard = null;
+  if (masterState.currentCard) {
+    maskedCard = revealed ? { ...masterState.currentCard } : { hidden: true };
+  }
+  return {
+    roomCode: masterState.roomCode,
+    hostId: masterState.hostId,
+    phase: masterState.phase,
+    initialLife: masterState.initialLife,
+    players: masterState.players.map(p => ({ ...p })),
+    timeline: [...masterState.timeline],
+    deckCount: masterState.deck.length,
+    turnIndex: masterState.turnIndex,
+    currentCard: maskedCard,
+    lastResult: masterState.lastResult ? { ...masterState.lastResult, card: { ...masterState.lastResult.card } } : null,
+    winnerIds: [...masterState.winnerIds]
+  };
+}
+
+function broadcastState() {
+  if (!isHost || !masterState) return;
+  const prevPhase = viewState ? viewState.phase : null;
+  viewState = makeMaskedState();
+  onPhaseChange(prevPhase, viewState.phase);
+  renderAll();
+
+  Object.values(clientConns).forEach(conn => {
+    if (conn.open) conn.send({ type: 'SYNC_STATE', state: makeMaskedState() });
+  });
+}
+
+function onPhaseChange(prevPhase, nextPhase) {
+  if (prevPhase !== nextPhase) {
+    stopPreviewAudio();
+    selectedSlot = null;
+    if (nextPhase === 'GAME_OVER') {
+      playSFX('win');
+      if (typeof confetti === 'function') confetti({ particleCount: 130, spread: 75, origin: { y: 0.6 } });
+    } else if (nextPhase === 'REVEAL' && viewState && viewState.lastResult) {
+      playSFX(viewState.lastResult.correct ? 'ok' : 'ng');
+    }
+  }
+}
+
+function findNextAliveTurnIndex(fromIdx) {
+  const n = masterState.players.length;
+  for (let offset = 1; offset <= n; offset++) {
+    const idx = (fromIdx + offset) % n;
+    if (masterState.players[idx].alive) return idx;
+  }
+  return 0;
+}
+
+function checkSurvivalVictory() {
+  const alivePlayers = masterState.players.filter(p => p.alive);
+  if (masterState.players.length >= 2 && alivePlayers.length === 1) {
+    masterState.winnerIds = [alivePlayers[0].id];
+    masterState.phase = 'GAME_OVER';
+    return true;
+  }
+  if (alivePlayers.length === 0) {
+    masterState.winnerIds = [];
+    masterState.phase = 'GAME_OVER';
+    return true;
+  }
+  if (masterState.deck.length === 0) {
+    const maxLife = Math.max(...alivePlayers.map(p => p.life));
+    masterState.winnerIds = alivePlayers.filter(p => p.life === maxLife).map(p => p.id);
+    masterState.phase = 'GAME_OVER';
+    return true;
+  }
+  return false;
+}
+
+async function handleAction(senderId, msg) {
+  if (!isHost || !masterState) return;
+
+  switch (msg.type) {
+    case 'JOIN': {
+      if (masterState.phase !== 'LOBBY') {
+        const c = clientConns[senderId];
+        if (c) c.send({ type: 'ERR', text: 'すでにゲームが始まっています' });
+        return;
+      }
+      if (masterState.players.length >= 8) return;
+      masterState.players.push({
+        id: senderId,
+        name: String(msg.name || 'プレイヤー').slice(0, 12),
+        life: masterState.initialLife,
+        skipsLeft: 1,
+        alive: true
+      });
+      broadcastState();
+      break;
+    }
+
+    case 'SET_LIFE': {
+      if (senderId !== masterState.hostId || masterState.phase !== 'LOBBY') return;
+      const val = Math.max(1, Math.min(10, Number(msg.life) || 2));
+      masterState.initialLife = val;
+      masterState.players.forEach(p => { p.life = val; });
+      broadcastState();
+      break;
+    }
+
+    case 'START': {
+      if (senderId !== masterState.hostId || masterState.phase !== 'LOBBY') return;
+      if (CLEAN_SONG_POOL.length < 2) {
+        playSFX('ng');
+        showToast('曲リストに最低2曲以上追加してから開始してください！', 'error');
+        return;
+      }
+      const deck = shuffle(CLEAN_SONG_POOL);
+      const firstCard = deck.pop();
+      masterState.deck = deck;
+      masterState.timeline = [firstCard];
+      masterState.players.forEach(p => {
+        p.life = masterState.initialLife;
+        p.skipsLeft = 1;
+        p.alive = true;
+      });
+      masterState.turnIndex = 0;
+      masterState.currentCard = deck.pop();
+      cachedPreviewUrl = null;
+      masterState.lastResult = null;
+      masterState.winnerIds = [];
+      masterState.phase = 'TURN';
+      broadcastState();
+      break;
+    }
+
+    case 'GET_PREVIEW_URL': {
+      if (!masterState.currentCard) return;
+      if (!cachedPreviewUrl) {
+        cachedPreviewUrl = await searchApplePreviewUrl(masterState.currentCard.a, masterState.currentCard.t);
+      }
+      const conn = clientConns[senderId];
+      if (conn && conn.open) {
+        conn.send({ type: 'PREVIEW_URL', url: cachedPreviewUrl });
+      }
+      break;
+    }
+
+    case 'SKIP': {
+      if (masterState.phase !== 'TURN') return;
+      const active = masterState.players[masterState.turnIndex];
+      if (!active || active.id !== senderId) return;
+      if (active.skipsLeft <= 0 || masterState.deck.length === 0) return;
+
+      active.skipsLeft -= 1;
+      masterState.currentCard = masterState.deck.pop();
+      cachedPreviewUrl = null;
+      stopPreviewAudio();
+      broadcastState();
+      break;
+    }
+
+    case 'PLACE': {
+      if (masterState.phase !== 'TURN') return;
+      const active = masterState.players[masterState.turnIndex];
+      if (!active || active.id !== senderId) return;
+
+      const slot = Number(msg.slot);
+      const tl = masterState.timeline;
+      if (isNaN(slot) || slot < 0 || slot > tl.length) return;
+
+      const card = masterState.currentCard;
+      const left = slot > 0 ? tl[slot - 1] : null;
+      const right = slot < tl.length ? tl[slot] : null;
+      const ok = (!left || left.y <= card.y) && (!right || card.y <= right.y);
+
+      if (ok) {
+        tl.splice(slot, 0, card);
+        masterState.lastResult = {
+          playerId: active.id,
+          playerName: active.name,
+          card,
+          correct: true,
+          insertedSlot: slot,
+          message: `${active.name} が正解！共通TLに追加されました。`
+        };
+      } else {
+        active.life = Math.max(0, active.life - 1);
+        if (active.life === 0) active.alive = false;
+        masterState.lastResult = {
+          playerId: active.id,
+          playerName: active.name,
+          card,
+          correct: false,
+          insertedSlot: null,
+          message: `${active.name} は不正解…ライフが1減りました（残り ${active.life}）${active.alive ? '' : '【脱落】'}。`
+        };
+      }
+
+      masterState.phase = 'REVEAL';
+      broadcastState();
+      break;
+    }
+
+    // ★ 結果発表後の「検索ミスやり直し（巻き戻し＆スキップ）」機能
+    case 'REWIND_AND_SKIP': {
+      if (masterState.phase !== 'REVEAL' || !masterState.lastResult) return;
+      const active = masterState.players[masterState.turnIndex];
+      if (senderId !== masterState.hostId && (!active || active.id !== senderId)) return;
+
+      if (masterState.deck.length === 0) {
+        const c = clientConns[senderId];
+        if (c) c.send({ type: 'ERR', text: '山札が空のため引き直しできません' });
+        if (senderId === myId) showToast('山札が空のため引き直しできません', 'error');
+        return;
+      }
+
+      const res = masterState.lastResult;
+      const targetPlayer = masterState.players.find(p => p.id === res.playerId);
+
+      if (res.correct && res.insertedSlot !== null) {
+        // 正解してTLに追加されていた場合はTLから取り除く
+        masterState.timeline.splice(res.insertedSlot, 1);
+      } else if (!res.correct && targetPlayer) {
+        // 不正解で減っていたライフを1戻し、脱落状態も解除
+        targetPlayer.life = Math.min(masterState.initialLife, targetPlayer.life + 1);
+        if (targetPlayer.life > 0) targetPlayer.alive = true;
+      }
+
+      // 新しい曲を山札から引き直し、同じ手番プレイヤーのままTURNへ戻る（通常スキップ回数は減らさない）
+      masterState.currentCard = masterState.deck.pop();
+      cachedPreviewUrl = null;
+      masterState.lastResult = null;
+      masterState.phase = 'TURN';
+      broadcastState();
+      break;
+    }
+
+    case 'NEXT': {
+      if (masterState.phase !== 'REVEAL') return;
+      const active = masterState.players[masterState.turnIndex];
+      if (senderId !== masterState.hostId && (!active || active.id !== senderId)) return;
+
+      if (checkSurvivalVictory()) {
+        broadcastState();
+        return;
+      }
+
+      masterState.turnIndex = findNextAliveTurnIndex(masterState.turnIndex);
+      masterState.currentCard = masterState.deck.pop();
+      cachedPreviewUrl = null;
+      masterState.lastResult = null;
+      masterState.phase = 'TURN';
+      broadcastState();
+      break;
+    }
+
+    case 'BACK_LOBBY': {
+      if (senderId !== masterState.hostId) return;
+      masterState.phase = 'LOBBY';
+      masterState.currentCard = null;
+      cachedPreviewUrl = null;
+      masterState.lastResult = null;
+      masterState.winnerIds = [];
+      masterState.players.forEach(p => {
+        p.life = masterState.initialLife;
+        p.skipsLeft = 1;
+        p.alive = true;
+      });
+      broadcastState();
+      break;
+    }
+  }
+}
+
+// ============================================================================
+// 4. 画面描画（renderAll）
+// ============================================================================
+function renderAll() {
+  const root = document.getElementById('app-root');
+  const codeBtn = document.getElementById('btn-copy-code');
+  const codeLabel = document.getElementById('header-code');
+
+  if (!viewState) {
+    codeBtn.classList.add('hidden');
+    codeBtn.classList.remove('flex');
+    root.innerHTML = renderJoinScreen();
+    return;
+  }
+
+  codeBtn.classList.remove('hidden');
+  codeBtn.classList.add('flex');
+  codeLabel.textContent = viewState.roomCode;
+
+  if (viewState.phase === 'LOBBY') root.innerHTML = renderLobbyScreen();
+  else if (viewState.phase === 'GAME_OVER') root.innerHTML = renderGameOverScreen();
+  else root.innerHTML = renderGameScreen();
+}
+
+function renderJoinScreen() {
+  return `
+    <div class="max-w-md w-full mx-auto bg-white rounded-3xl p-6 sm:p-8 shadow-lg border-2 border-slate-200 space-y-5">
+      <div class="text-center">
+        <div class="w-16 h-16 mx-auto rounded-full bg-indigo-600 text-white flex items-center justify-center text-3xl shadow mb-3">
+          <i class="fa-solid fa-music"></i>
+        </div>
+        <h2 class="font-display text-2xl font-black text-slate-900">HITSTER J-POP SURVIVAL</h2>
+        <p class="text-xs font-bold text-slate-500 mt-1">収録 ${CLEAN_SONG_POOL.length} 曲・全員共通TLサバイバル</p>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-black text-slate-700 mb-1">ニックネーム</label>
+          <input id="nick-input" type="text" maxlength="12" placeholder="例：ハナコ"
+            class="w-full px-4 py-3 rounded-2xl border-2 border-slate-300 focus:border-indigo-600 focus:outline-none font-bold bg-slate-50" />
+        </div>
+        <div>
+          <label class="block text-xs font-black text-slate-700 mb-1">合言葉（1文字以上でOK）</label>
+          <input id="code-input" type="text" maxlength="20" placeholder="例：1 や a"
+            class="w-full px-4 py-3 rounded-2xl border-2 border-slate-300 focus:border-indigo-600 focus:outline-none font-bold bg-slate-50" />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 pt-1">
+        <button onclick="createRoom()" class="py-3.5 px-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm shadow transition active:scale-95">
+          部屋を作る
+        </button>
+        <button onclick="joinRoom()" class="py-3.5 px-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow transition active:scale-95">
+          部屋に入る
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+function renderLobbyScreen() {
+  return `
+    <div class="max-w-3xl w-full mx-auto bg-white rounded-3xl p-6 sm:p-8 shadow-lg border-2 border-slate-200 space-y-6">
+      <div class="flex flex-wrap items-center justify-between gap-2 pb-4 border-b border-slate-200">
+        <div>
+          <span class="px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs font-black">ロビー</span>
+          <h2 class="text-2xl font-black text-slate-900 mt-1">参加者（${viewState.players.length}人）</h2>
+        </div>
+
+        <div class="flex items-center gap-2 bg-rose-50 border border-rose-200 px-4 py-2 rounded-2xl">
+          <i class="fa-solid fa-heart text-rose-500"></i>
+          <span class="text-sm font-black text-slate-800">初期ライフ:</span>
+          ${isHost ? `
+            <select onchange="playSFX('tap'); sendAction({ type: 'SET_LIFE', life: Number(this.value) })"
+              class="px-2.5 py-1 rounded-xl border border-rose-300 bg-white font-black text-rose-700">
+              ${[1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}" ${viewState.initialLife === n ? 'selected' : ''}>${n}</option>`).join('')}
+            </select>
+          ` : `
+            <span class="font-black text-rose-700 text-base">${viewState.initialLife}</span>
+          `}
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        ${viewState.players.map(p => `
+          <div class="p-4 rounded-2xl border-2 border-slate-200 bg-slate-50 flex items-center justify-between">
+            <div class="font-black text-slate-900 flex items-center gap-2">
+              <span>${esc(p.name)}</span>
+              ${p.id === viewState.hostId ? '<span class="px-2 py-0.5 text-[10px] rounded bg-indigo-600 text-white">HOST</span>' : ''}
+              ${p.id === myId ? '<span class="px-2 py-0.5 text-[10px] rounded bg-slate-200 text-slate-800">自分</span>' : ''}
+            </div>
+            <div class="text-sm font-black text-rose-600">
+              <i class="fa-solid fa-heart mr-1"></i>${p.life}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      ${isHost ? `
+        <button onclick="playSFX('tap'); sendAction({ type: 'START' })"
+          class="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-lg shadow-lg transition active:scale-95">
+          ゲーム開始（収録 ${CLEAN_SONG_POOL.length} 曲）
+        </button>
+      ` : `
+        <p class="text-center text-sm font-bold text-slate-500">ホストがゲームを開始するのを待っています...</p>
+      `}
+    </div>
+  `;
+}
+
+function renderGameScreen() {
+  const active = viewState.players[viewState.turnIndex];
+  const isMyTurn = active && active.id === myId;
+  const me = viewState.players.find(p => p.id === myId);
+  const canPlaceNow = viewState.phase === 'TURN' && isMyTurn;
+
+  return `
+    <div class="space-y-5">
+      <!-- プレイヤーライフ一覧 -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        ${viewState.players.map((p, idx) => {
+          const isTurn = idx === viewState.turnIndex && viewState.phase !== 'REVEAL';
+          return `
+            <div class="p-3 rounded-2xl border-2 ${!p.alive ? 'bg-slate-100 border-slate-200 opacity-50' : (isTurn ? 'bg-indigo-50 border-indigo-500 shadow' : 'bg-white border-slate-200')}">
+              <div class="flex items-center justify-between">
+                <span class="font-black text-sm text-slate-900 truncate">${esc(p.name)}</span>
+                ${isTurn ? '<span class="px-2 py-0.5 text-[10px] rounded-full bg-indigo-600 text-white font-black">手番</span>' : ''}
+                ${!p.alive ? '<span class="px-2 py-0.5 text-[10px] rounded-full bg-slate-500 text-white font-black">脱落</span>' : ''}
+              </div>
+              <div class="mt-1.5 flex items-center justify-between text-xs font-black">
+                <span class="text-rose-600"><i class="fa-solid fa-heart mr-1"></i>ライフ ${p.life}</span>
+                <span class="text-slate-600">スキップ残: ${p.skipsLeft}</span>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <!-- 中央操作エリア -->
+      <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-lg border-2 border-slate-200">
+        ${renderCenterArea(active, isMyTurn, me)}
+      </div>
+
+      <!-- 全員共通タイムライン -->
+      <div class="bg-white rounded-3xl p-5 shadow-lg border-2 border-slate-200">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="font-black text-base sm:text-lg text-slate-900">
+            <i class="fa-solid fa-timeline text-indigo-600 mr-1.5"></i> 全員共通タイムライン（${viewState.timeline.length}枚）
+          </h3>
+          <span class="text-xs font-bold text-slate-500">山札残り: ${viewState.deckCount}枚</span>
+        </div>
+
+        <div class="flex items-center gap-2 overflow-x-auto pb-2 tl-scroll">
+          <span class="text-xs font-black text-slate-400 flex-shrink-0">古い ←</span>
+          ${renderTimelineItems(canPlaceNow)}
+          <span class="text-xs font-black text-slate-400 flex-shrink-0">→ 新しい</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderCenterArea(active, isMyTurn, me) {
+  if (viewState.phase === 'REVEAL' && viewState.lastResult) {
+    const r = viewState.lastResult;
+    return `
+      <div class="text-center space-y-4">
+        <div class="inline-block px-4 py-1 rounded-full text-sm font-black ${r.correct ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+          ${r.correct ? '正解！' : '不正解！'}
+        </div>
+        <div class="max-w-md mx-auto bg-slate-900 text-white rounded-3xl p-6 shadow-lg">
+          <div class="font-display text-5xl font-black text-amber-400">${r.card.y}</div>
+          <div class="text-xl font-black mt-2">${esc(r.card.t)}</div>
+          <div class="text-sm font-bold text-slate-300 mt-1">${esc(r.card.a)}</div>
+        </div>
+        <p class="text-base font-black text-slate-800">${esc(r.message)}</p>
+        ${(isHost || isMyTurn) ? `
+          <div class="flex flex-wrap items-center justify-center gap-3 pt-1">
+            <button onclick="playSFX('tap'); sendAction({ type: 'NEXT' })"
+              class="px-7 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-base shadow transition active:scale-95">
+              次へ進む
+            </button>
+
+            <button ${viewState.deckCount <= 0 ? 'disabled' : ''}
+              onclick="playSFX('tap'); sendAction({ type: 'REWIND_AND_SKIP' })"
+              class="px-5 py-3.5 rounded-2xl bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-950 font-black text-sm border-2 border-amber-300 shadow-sm transition active:scale-95">
+              <i class="fa-solid fa-rotate-left mr-1"></i> 検索ミスやり直し（ライフ戻してスキップ）
+            </button>
+          </div>
+        ` : `<p class="text-xs font-bold text-slate-500">ホストまたは手番プレイヤーの操作を待っています...</p>`}
+      </div>
+    `;
+  }
+
+  return `
+    <div class="flex flex-col sm:flex-row items-center gap-6">
+      <div class="flex flex-col items-center flex-shrink-0">
+        <div id="disc-icon" class="w-28 h-28 rounded-full bg-slate-900 border-4 border-indigo-500 text-white flex items-center justify-center text-3xl shadow-lg ${isPreviewPlaying ? 'spin-slow' : ''}">
+          <i class="fa-solid fa-compact-disc"></i>
+        </div>
+        <button onclick="toggleSongPreview()"
+          class="mt-3 px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm shadow transition active:scale-95">
+          <i class="fa-solid fa-play mr-1"></i><span id="play-btn-label">曲を再生する</span>
+        </button>
+      </div>
+
+      <div class="flex-1 w-full text-center sm:text-left space-y-3">
+        <div class="text-sm font-black text-indigo-600">
+          現在の手番: ${esc(active ? active.name : '')}
+        </div>
+
+        ${isMyTurn ? `
+          <p class="text-base font-black text-slate-900">
+            曲を聴いて、下の共通TLのどこに入るか選んでください。
+          </p>
+          <div class="flex flex-wrap items-center justify-center sm:justify-start gap-3 pt-1">
+            <button ${selectedSlot === null ? 'disabled' : ''} onclick="confirmSlot()"
+              class="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-black shadow transition active:scale-95">
+              ${selectedSlot === null ? '位置を選んでください' : `左から ${selectedSlot + 1} 番目に置く`}
+            </button>
+
+            <button ${(me && me.skipsLeft > 0 && viewState.deckCount > 0) ? '' : 'disabled'}
+              onclick="playSFX('tap'); sendAction({ type: 'SKIP' })"
+              class="px-5 py-3 rounded-2xl bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-950 font-black border border-amber-300 transition active:scale-95">
+              スキップ（残 ${me ? me.skipsLeft : 0} 回）
+            </button>
+          </div>
+        ` : `
+          <p class="text-sm font-bold text-slate-600">
+            ${esc(active ? active.name : '')} が配置位置を選んでいます。各自「曲を再生する」を押して聴けます。
+          </p>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function renderTimelineItems(canSelect) {
+  const tl = viewState.timeline;
+  let html = '';
+  for (let i = 0; i <= tl.length; i++) {
+    if (canSelect) {
+      const picked = selectedSlot === i;
+      html += `
+        <button onclick="playSFX('tap'); selectedSlot = ${i}; renderAll();"
+          class="flex-shrink-0 w-16 h-28 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center font-black text-xs transition
+          ${picked ? 'bg-indigo-600 border-indigo-600 text-white scale-105 shadow' : 'bg-indigo-50 border-indigo-400 text-indigo-700 hover:bg-indigo-100'}">
+          <i class="fa-solid ${picked ? 'fa-check' : 'fa-plus'} text-base mb-1"></i>
+          <span>${picked ? 'ここ' : '置く'}</span>
+        </button>
+      `;
+    }
+    if (i < tl.length) {
+      const c = tl[i];
+      html += `
+        <div class="flex-shrink-0 w-32 h-28 rounded-2xl bg-slate-900 text-white p-3 flex flex-col justify-between shadow">
+          <div class="font-display text-2xl font-black text-amber-400 text-center">${c.y}</div>
+          <div class="text-center">
+            <div class="text-xs font-black truncate">${esc(c.t)}</div>
+            <div class="text-[11px] font-bold text-slate-300 truncate">${esc(c.a)}</div>
+          </div>
+        </div>
+      `;
+    }
+  }
+  return html;
+}
+
+function renderGameOverScreen() {
+  const winners = viewState.players.filter(p => viewState.winnerIds.includes(p.id));
+  return `
+    <div class="max-w-2xl w-full mx-auto bg-white rounded-3xl p-6 sm:p-8 shadow-lg border-2 border-amber-300 text-center space-y-5">
+      <div class="text-4xl text-amber-500"><i class="fa-solid fa-trophy"></i></div>
+      <h2 class="text-2xl sm:text-3xl font-black text-slate-900">
+        ${winners.length > 0 ? `勝利: ${winners.map(w => esc(w.name)).join(' / ')}` : '勝者なし'}
+      </h2>
+      <div class="text-left bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-1.5">
+        <div class="text-xs font-black text-slate-600">最終順位・残ライフ</div>
+        ${viewState.players.slice().sort((a, b) => b.life - a.life).map(p => `
+          <div class="flex items-center justify-between text-sm font-black py-1 border-b border-slate-200 last:border-none">
+            <span>${esc(p.name)}</span>
+            <span class="${p.alive ? 'text-emerald-600' : 'text-slate-400'}">${p.alive ? `生存（ライフ ${p.life}）` : '脱落'}</span>
+          </div>
+        `).join('')}
+      </div>
+      ${isHost ? `
+        <button onclick="playSFX('tap'); sendAction({ type: 'BACK_LOBBY' })"
+          class="px-7 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-base shadow transition active:scale-95">
+          ロビーへ戻る
+        </button>
+      ` : `<p class="text-xs font-bold text-slate-500">ホストがロビーへ戻るのを待っています...</p>`}
+    </div>
+  `;
+}
+
+function confirmSlot() {
+  if (selectedSlot === null) return;
+  playSFX('tap');
+  sendAction({ type: 'PLACE', slot: selectedSlot });
+}
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+renderAll();
+</script>
+</body>
+</html>
