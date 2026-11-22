@@ -94,8 +94,9 @@
         <p>3. 順番に1枚引き、再生ボタンで試聴して、発売年が左から右へ古→新になる位置に置きます。</p>
         <p>4. 年代順が合っていればカードがTLに追加されます。<strong>間違えるとライフが1減ります</strong>。</p>
         <p>5. <strong>スキップは1人1回だけ</strong>使えます（現在の曲を捨てて次の曲を引きます）。</p>
-        <p>6. 検索ミスなどで別の曲が流れた場合は、結果発表画面の<strong>「検索ミスやり直し（ライフ戻してスキップ）」</strong>でライフやTLを元に戻して新しい曲を引き直せます。</p>
-        <p>7. ライフが0になると脱落し、<strong>最後まで生き残ったプレイヤーの勝利</strong>です。</p>
+        <p>6. <strong>音源が見つからなかった場合</strong>は、回数制限なしの<strong>「音源なしスキップ」</strong>でスキップ権を減らさずに次へ進めます。</p>
+        <p>7. 検索ミスなどで別の曲が流れた場合は、結果発表画面の<strong>「検索ミスやり直し（ライフ戻してスキップ）」</strong>でやり直せます。</p>
+        <p>8. ライフが0になると脱落し、<strong>最後まで生き残ったプレイヤーの勝利</strong>です。</p>
       </div>
       <div class="p-4 bg-slate-50 border-t border-slate-200 text-right">
         <button onclick="closeRules()" class="px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black">閉じる</button>
@@ -107,9 +108,6 @@
 // ============================================================================
 // 1. 曲リスト（★★★ ここに曲リストを挿入してください ★★★）
 //    フォーマット: { y: リリース年(数値), a: "アーティスト名", t: "曲名" },
-//    例:
-//      { y: 1995, a: "スピッツ", t: "ロビンソン" },
-//      { y: 2018, a: "米津玄師", t: "Lemon" },
 // ============================================================================
 const SONG_POOL = [
   // ▼▼▼ ここに曲リストを挿入 ▼▼▼
@@ -261,6 +259,7 @@ const SONG_POOL = [
   { y: 2019, a: "King Gnu", t: "白日" },
   { y: 2019, a: "LiSA", t: "紅蓮華" },
   { y: 2019, a: "菅田将暉", t: "まちがいさがし" },
+
 // 1990s
   { y: 1990, a: "B.B.クィーンズ", t: "おどるポンポコリン" },
   { y: 1990, a: "KAN", t: "愛は勝つ" },
@@ -551,7 +550,6 @@ const SONG_POOL = [
   // ▲▲▲ ここに曲リストを挿入 ▲▲▲
 ];
 
-// 重複排除＆配列順正規化
 const CLEAN_SONG_POOL = (() => {
   const seen = new Set();
   const list = [];
@@ -674,10 +672,10 @@ function isBannedVersion(trackName, collectionName) {
   return BANNED_VERSION_WORDS.some(w => lowTrack.includes(w) || lowCol.includes(w));
 }
 
-function searchApplePreviewUrl(artist, title) {
+function queryItunesJsonp(searchTerm) {
   return new Promise((resolve) => {
     const callbackName = 'appleMusicCb_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
-    const query = encodeURIComponent(`${artist} ${title}`);
+    const query = encodeURIComponent(searchTerm);
     const script = document.createElement('script');
     let settled = false;
 
@@ -690,7 +688,7 @@ function searchApplePreviewUrl(artist, title) {
       if (!settled) {
         settled = true;
         cleanup();
-        resolve(null);
+        resolve([]);
       }
     }, 6000);
 
@@ -699,37 +697,7 @@ function searchApplePreviewUrl(artist, title) {
       settled = true;
       clearTimeout(timer);
       cleanup();
-
-      const results = (data && Array.isArray(data.results)) ? data.results : [];
-      const normTitle = normalizeStr(title);
-      const normArtist = normalizeStr(artist);
-
-      let best = null;
-      let bestScore = -1;
-
-      for (const item of results) {
-        if (!item.previewUrl) continue;
-        if (isBannedVersion(item.trackName, item.collectionName)) continue;
-
-        const rTitle = normalizeStr(item.trackName);
-        const rArtist = normalizeStr(item.artistName);
-
-        let score = 0;
-        if (rTitle === normTitle) score += 6;
-        else if (rTitle.includes(normTitle) && normTitle.length >= 2) score += 3;
-        else continue;
-
-        if (rArtist === normArtist) score += 6;
-        else if (rArtist.includes(normArtist) || normArtist.includes(rArtist)) score += 3;
-        else continue;
-
-        if (score > bestScore) {
-          bestScore = score;
-          best = item.previewUrl;
-        }
-      }
-
-      resolve(best);
+      resolve((data && Array.isArray(data.results)) ? data.results : []);
     };
 
     script.src = `https://itunes.apple.com/search?term=${query}&media=music&entity=song&country=JP&limit=15&callback=${callbackName}`;
@@ -738,11 +706,56 @@ function searchApplePreviewUrl(artist, title) {
         settled = true;
         clearTimeout(timer);
         cleanup();
-        resolve(null);
+        resolve([]);
       }
     };
     document.body.appendChild(script);
   });
+}
+
+async function searchApplePreviewUrl(artist, title) {
+  const results = await queryItunesJsonp(`${artist} ${title}`);
+  const normTitle = normalizeStr(title);
+  const normArtist = normalizeStr(artist);
+
+  // 第1パス：別バージョン除外＋曲名・アーティスト名の一致度が高いもの
+  let bestStrict = null;
+  let bestStrictScore = -1;
+
+  // 第2パス：別バージョン除外＋曲名が一致するもの（名義表記ゆれ救済）
+  let bestFallback = null;
+  let bestFallbackScore = -1;
+
+  for (const item of results) {
+    if (!item.previewUrl) continue;
+    if (isBannedVersion(item.trackName, item.collectionName)) continue;
+
+    const rTitle = normalizeStr(item.trackName);
+    const rArtist = normalizeStr(item.artistName);
+
+    const titleExact = rTitle === normTitle;
+    const titleIncludes = rTitle.includes(normTitle) && normTitle.length >= 2;
+    if (!titleExact && !titleIncludes) continue;
+
+    const artistExact = rArtist === normArtist;
+    const artistIncludes = normArtist.length >= 2 && (rArtist.includes(normArtist) || normArtist.includes(rArtist));
+
+    if (artistExact || artistIncludes) {
+      const score = (titleExact ? 6 : 3) + (artistExact ? 6 : 3);
+      if (score > bestStrictScore) {
+        bestStrictScore = score;
+        bestStrict = item.previewUrl;
+      }
+    } else if (titleExact) {
+      const score = 4;
+      if (score > bestFallbackScore) {
+        bestFallbackScore = score;
+        bestFallback = item.previewUrl;
+      }
+    }
+  }
+
+  return bestStrict || bestFallback || null;
 }
 
 async function toggleSongPreview() {
@@ -765,7 +778,7 @@ function playPreviewByUrl(url) {
   isPreviewLoading = false;
   if (!url) {
     updatePlayButtonUI();
-    showToast('この曲の公式サンプル音源が見つかりませんでした。スキップまたは再度お試しください。', 'warn');
+    showToast('試聴サンプルが見つかりませんでした。「音源なしスキップ」で次へ進めます。', 'warn');
     return;
   }
 
@@ -778,7 +791,7 @@ function playPreviewByUrl(url) {
   previewAudio.onerror = () => {
     isPreviewPlaying = false;
     updatePlayButtonUI();
-    showToast('音声の再生に失敗しました。', 'error');
+    showToast('音声の再生に失敗しました。「音源なしスキップ」も使えます。', 'error');
   };
 
   previewAudio.play().then(() => {
@@ -808,7 +821,7 @@ function updatePlayButtonUI() {
 // ============================================================================
 // 3. PeerJS P2P 通信＆ホスト権威型ステート（完全ネタバレ防止・巻き戻し対応）
 // ============================================================================
-const ROOM_PREFIX = 'hitster-jpop-surv-v2-';
+const ROOM_PREFIX = 'hitster-jpop-surv-v3-';
 let peer = null;
 let myId = null;
 let myName = '';
@@ -819,6 +832,7 @@ let clientConns = {};
 
 let masterState = null;
 let cachedPreviewUrl = null;
+let cachedPreviewChecked = false;
 let viewState = null;
 let selectedSlot = null;
 
@@ -893,6 +907,7 @@ function createRoom() {
       deck: [],
       turnIndex: 0,
       currentCard: null,
+      previewNotFound: false,
       lastResult: null,
       winnerIds: []
     };
@@ -963,16 +978,21 @@ function sendAction(payload) {
   else if (hostConn && hostConn.open) hostConn.send(payload);
 }
 
+async function resolveCurrentPreviewOnHost() {
+  if (!masterState || !masterState.currentCard) return null;
+  if (!cachedPreviewChecked) {
+    cachedPreviewUrl = await searchApplePreviewUrl(masterState.currentCard.a, masterState.currentCard.t);
+    cachedPreviewChecked = true;
+    masterState.previewNotFound = !cachedPreviewUrl;
+    broadcastState();
+  }
+  return cachedPreviewUrl;
+}
+
 async function requestPreviewUrlFromHost() {
   if (isHost) {
-    if (!masterState || !masterState.currentCard) {
-      playPreviewByUrl(null);
-      return;
-    }
-    if (!cachedPreviewUrl) {
-      cachedPreviewUrl = await searchApplePreviewUrl(masterState.currentCard.a, masterState.currentCard.t);
-    }
-    playPreviewByUrl(cachedPreviewUrl);
+    const url = await resolveCurrentPreviewOnHost();
+    playPreviewByUrl(url);
   } else if (hostConn && hostConn.open) {
     hostConn.send({ type: 'GET_PREVIEW_URL' });
   }
@@ -994,6 +1014,7 @@ function makeMaskedState() {
     deckCount: masterState.deck.length,
     turnIndex: masterState.turnIndex,
     currentCard: maskedCard,
+    previewNotFound: Boolean(masterState.previewNotFound),
     lastResult: masterState.lastResult ? { ...masterState.lastResult, card: { ...masterState.lastResult.card } } : null,
     winnerIds: [...masterState.winnerIds]
   };
@@ -1103,7 +1124,9 @@ async function handleAction(senderId, msg) {
       });
       masterState.turnIndex = 0;
       masterState.currentCard = deck.pop();
+      masterState.previewNotFound = false;
       cachedPreviewUrl = null;
+      cachedPreviewChecked = false;
       masterState.lastResult = null;
       masterState.winnerIds = [];
       masterState.phase = 'TURN';
@@ -1113,16 +1136,15 @@ async function handleAction(senderId, msg) {
 
     case 'GET_PREVIEW_URL': {
       if (!masterState.currentCard) return;
-      if (!cachedPreviewUrl) {
-        cachedPreviewUrl = await searchApplePreviewUrl(masterState.currentCard.a, masterState.currentCard.t);
-      }
+      const url = await resolveCurrentPreviewOnHost();
       const conn = clientConns[senderId];
       if (conn && conn.open) {
-        conn.send({ type: 'PREVIEW_URL', url: cachedPreviewUrl });
+        conn.send({ type: 'PREVIEW_URL', url });
       }
       break;
     }
 
+    // 1人1回限定の通常スキップ
     case 'SKIP': {
       if (masterState.phase !== 'TURN') return;
       const active = masterState.players[masterState.turnIndex];
@@ -1131,7 +1153,25 @@ async function handleAction(senderId, msg) {
 
       active.skipsLeft -= 1;
       masterState.currentCard = masterState.deck.pop();
+      masterState.previewNotFound = false;
       cachedPreviewUrl = null;
+      cachedPreviewChecked = false;
+      stopPreviewAudio();
+      broadcastState();
+      break;
+    }
+
+    // 音源が見つからなかった時専用の無料スキップ（スキップ権は減らさない）
+    case 'SKIP_NO_AUDIO': {
+      if (masterState.phase !== 'TURN') return;
+      const active = masterState.players[masterState.turnIndex];
+      if (!active || active.id !== senderId) return;
+      if (masterState.deck.length === 0) return;
+
+      masterState.currentCard = masterState.deck.pop();
+      masterState.previewNotFound = false;
+      cachedPreviewUrl = null;
+      cachedPreviewChecked = false;
       stopPreviewAudio();
       broadcastState();
       break;
@@ -1179,7 +1219,7 @@ async function handleAction(senderId, msg) {
       break;
     }
 
-    // ★ 結果発表後の「検索ミスやり直し（巻き戻し＆スキップ）」機能
+    // 結果発表後の「検索ミスやり直し（巻き戻し＆スキップ）」機能
     case 'REWIND_AND_SKIP': {
       if (masterState.phase !== 'REVEAL' || !masterState.lastResult) return;
       const active = masterState.players[masterState.turnIndex];
@@ -1196,17 +1236,16 @@ async function handleAction(senderId, msg) {
       const targetPlayer = masterState.players.find(p => p.id === res.playerId);
 
       if (res.correct && res.insertedSlot !== null) {
-        // 正解してTLに追加されていた場合はTLから取り除く
         masterState.timeline.splice(res.insertedSlot, 1);
       } else if (!res.correct && targetPlayer) {
-        // 不正解で減っていたライフを1戻し、脱落状態も解除
         targetPlayer.life = Math.min(masterState.initialLife, targetPlayer.life + 1);
         if (targetPlayer.life > 0) targetPlayer.alive = true;
       }
 
-      // 新しい曲を山札から引き直し、同じ手番プレイヤーのままTURNへ戻る（通常スキップ回数は減らさない）
       masterState.currentCard = masterState.deck.pop();
+      masterState.previewNotFound = false;
       cachedPreviewUrl = null;
+      cachedPreviewChecked = false;
       masterState.lastResult = null;
       masterState.phase = 'TURN';
       broadcastState();
@@ -1225,7 +1264,9 @@ async function handleAction(senderId, msg) {
 
       masterState.turnIndex = findNextAliveTurnIndex(masterState.turnIndex);
       masterState.currentCard = masterState.deck.pop();
+      masterState.previewNotFound = false;
       cachedPreviewUrl = null;
+      cachedPreviewChecked = false;
       masterState.lastResult = null;
       masterState.phase = 'TURN';
       broadcastState();
@@ -1236,7 +1277,9 @@ async function handleAction(senderId, msg) {
       if (senderId !== masterState.hostId) return;
       masterState.phase = 'LOBBY';
       masterState.currentCard = null;
+      masterState.previewNotFound = false;
       cachedPreviewUrl = null;
+      cachedPreviewChecked = false;
       masterState.lastResult = null;
       masterState.winnerIds = [];
       masterState.players.forEach(p => {
@@ -1282,7 +1325,7 @@ function renderJoinScreen() {
           <i class="fa-solid fa-music"></i>
         </div>
         <h2 class="font-display text-2xl font-black text-slate-900">HITSTER J-POP SURVIVAL</h2>
-        <p class="text-xs font-bold text-slate-500 mt-1">収録 ${CLEAN_SONG_POOL.length} 曲・全員共通TLサバイバル</p>
+        <p class="text-xs font-bold text-slate-500 mt-1">登録曲数 ${CLEAN_SONG_POOL.length} 曲・全員共通TLサバイバル</p>
       </div>
 
       <div class="space-y-3">
@@ -1351,7 +1394,7 @@ function renderLobbyScreen() {
       ${isHost ? `
         <button onclick="playSFX('tap'); sendAction({ type: 'START' })"
           class="w-full py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-lg shadow-lg transition active:scale-95">
-          ゲーム開始（収録 ${CLEAN_SONG_POOL.length} 曲）
+          ゲーム開始（登録 ${CLEAN_SONG_POOL.length} 曲）
         </button>
       ` : `
         <p class="text-center text-sm font-bold text-slate-500">ホストがゲームを開始するのを待っています...</p>
@@ -1461,6 +1504,13 @@ function renderCenterArea(active, isMyTurn, me) {
           現在の手番: ${esc(active ? active.name : '')}
         </div>
 
+        ${viewState.previewNotFound ? `
+          <div class="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-black">
+            <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+            この曲の試聴サンプルが見つかりませんでした。スキップ権を消費せずに「音源なしスキップ」ができます。
+          </div>
+        ` : ''}
+
         ${isMyTurn ? `
           <p class="text-base font-black text-slate-900">
             曲を聴いて、下の共通TLのどこに入るか選んでください。
@@ -1476,6 +1526,14 @@ function renderCenterArea(active, isMyTurn, me) {
               class="px-5 py-3 rounded-2xl bg-amber-100 hover:bg-amber-200 disabled:opacity-40 text-amber-950 font-black border border-amber-300 transition active:scale-95">
               スキップ（残 ${me ? me.skipsLeft : 0} 回）
             </button>
+
+            ${viewState.previewNotFound ? `
+              <button ${viewState.deckCount <= 0 ? 'disabled' : ''}
+                onclick="playSFX('tap'); sendAction({ type: 'SKIP_NO_AUDIO' })"
+                class="px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-black shadow transition active:scale-95">
+                <i class="fa-solid fa-forward-step mr-1"></i> 音源なしスキップ（回数消費なし）
+              </button>
+            ` : ''}
           </div>
         ` : `
           <p class="text-sm font-bold text-slate-600">
